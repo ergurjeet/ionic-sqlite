@@ -13,13 +13,6 @@ export class SqliteDbProvider {
 
   constructor(private platform: Platform, private sqlite: SQLite) { }
 
-  private loadDB(){
-    return this.platform.ready().then(() => {
-      //(window as any).plugins.sqlDB.remove(this.options.name, 0);
-      return this.sqlite.create(this.options);
-    });
-  }
-
   getArticles():Promise<any>{
     let query = "SELECT title FROM articles";
     return this.query(query, [])
@@ -29,21 +22,48 @@ export class SqliteDbProvider {
           items.push(data.rows.item(i));
         }
         return items;
-      });
-  }
-
-  public query(query, params: any[] = []){
-    return this.loadDB()
-      .then((db: SQLiteObject) => {
-        return db.executeSql(query, params);
-      })
-      .then((data) => {
-        console.log(JSON.stringify(data));
-        return data;
       })
       .catch(e => {
         console.log('Database Error: '+JSON.stringify(e));
         return [];
+      });
+  }
+
+  public query(query, params: any[] = []){
+    return this.platform.ready()
+      .then(() => {
+        return this.sqlite.create(this.options);
+      })
+      .then((db: SQLiteObject) => {
+        return db.executeSql(query, params);
+      });
+  }
+
+  /**
+   * Remove and copy database using an-rahulpandey/cordova-plugin-dbcopy plugin.
+   * You can use this approach if setting createFromLocation:1 doesn't work for you.
+   *
+   * @param query
+   * @param {any[]} params
+   * @returns {Promise<any>}
+   */
+  public queryWithDBCopyPlugin(query, params: any[] = []){
+    return this.platform.ready()
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          (window as any).plugins.sqlDB.remove(this.options.name, 0, (status) => {
+            (window as any).plugins.sqlDB.copy(this.options.name, 0, (status) => {
+              resolve(this.sqlite.create(this.options));
+            }, (status) => {
+              reject(status);
+            });
+          }, (status) => {
+            reject(status);
+          });
+        });
+      })
+      .then((db: SQLiteObject) => {
+        return db.executeSql(query, params);
       });
   }
 
